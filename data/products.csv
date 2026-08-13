@@ -1,0 +1,21 @@
+product_id,name,category,price,quantity
+P001,Laptop,Electronics,55000,12
+P002,Wireless Mouse,Accessories,1200,25
+P003,USB to C Cable,Accessories,600,18
+P004,Mechanical Keyboard,Electronics,3500,8
+P005,Headphones,Audio,2500,14
+P006,Webcam,Electronics,4200,6
+P007,Power Bank,Accessories,1800,20
+P008,Office Chair,Furniture,8500,4
+P009,Monitor,Electronics,15000,10
+P010,External Hard Drive,Storage,6500,7
+P011,USB Flash Drive,Storage,900,30
+P012,Bluetooth Speaker,Audio,3200,9
+P013,WiFi Router,Networking,2800,11
+P014,Printer,Electronics,12500,5
+P015,Desk Lamp,Office Supplies,1500,16
+P016,Notebook Pack,Office Supplies,450,40
+P017,Wireless Earbuds,Audio,3000,13
+P018,HDMI Cable,Accessories,750,22
+P019,Keyboard and Mouse Combo,Electronics,2200,17
+P020,UPS Backup,Electronics,4800,3
