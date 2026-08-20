@@ -32,6 +32,10 @@ def product_menu():
             name = input("Enter Product Name: ")
             category = input("Enter Category: ")
 
+            if not product_id or not name or not category:
+                print("Product ID, name, and category cannot be empty.")
+                continue
+
             try:
                 price = float(input("Enter Price: "))
                 quantity = int(input("Enter Quantity: "))
@@ -120,7 +124,9 @@ def customer_menu():
         print("1. Add Customer")
         print("2. View Customers")
         print("3. Search Customer")
-        print("4. Back to Main Menu")
+        print("4. Update Customer")
+        print("5. Delete Customer")
+        print("6. Back to Main Menu")
 
         choice = input("Enter your choice: ")
 
@@ -130,6 +136,10 @@ def customer_menu():
             customer_id = input("Enter Customer ID: ")
             name = input("Enter Customer Name: ")
             phone = input("Enter Phone Number: ")
+
+            if not customer_id or not name:
+                print("Customer ID and name cannot be empty.")
+                continue
 
             if not phone.isdigit() or len(phone) != 10:
                 print("Please enter a valid 10-digit phone number.")
@@ -154,8 +164,31 @@ def customer_menu():
             customer_id = input("Enter Customer ID: ")
             customer_manager.search_customer(customer_id)
 
-        # Back to Main Menu
+        # Update Customer
         elif choice == "4":
+
+            customer_id = input("Enter Customer ID: ")
+            name = input("Enter New Name: ")
+            phone = input("Enter New Phone Number: ")
+
+            if not phone.isdigit() or len(phone) != 10:
+                print("Please enter a valid 10-digit phone number.")
+                continue
+
+            customer_manager.update_customer(
+                customer_id,
+                name,
+                phone
+            )
+
+        # Delete Customer
+        elif choice == "5":
+
+            customer_id = input("Enter Customer ID: ")
+            customer_manager.delete_customer(customer_id)
+
+        # Back to Main Menu
+        elif choice == "6":
 
             break
 
@@ -170,6 +203,10 @@ def create_sale_menu():
 
     customer_id = input("Enter Customer ID: ")
     product_id = input("Enter Product ID: ")
+
+    if not customer_id or not product_id:
+        print("Customer ID and Product ID cannot be empty.")
+        return
 
     try:
         quantity = int(input("Enter Quantity: "))

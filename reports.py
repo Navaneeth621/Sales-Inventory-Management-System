@@ -1,56 +1,105 @@
-from file_handler import read_records
+from database import create_connection
 from product import Product
+from mysql.connector import Error
 
 
 class ReportManager:
 
-    SALES_FILE = "data/sales.csv"
-    PRODUCTS_FILE = "data/products.csv"
-
     def sales_summary(self):
-        records = read_records(self.SALES_FILE)
 
-        if not records:
-            print("No sales data available.")
+        connection = create_connection()
+
+        if connection is None:
             return
 
-        total_transactions = len(records)
-        total_revenue = 0
+        cursor = connection.cursor()
 
-        for record in records:
-            total_revenue += float(record["total"])
+        try:
 
-        average_sale = total_revenue / total_transactions
+            query = """
+                SELECT
+                    COUNT(*) AS total_transactions,
+                    COALESCE(SUM(total), 0) AS total_revenue,
+                    COALESCE(AVG(total), 0) AS average_sale
+                FROM sales
+            """
 
-        print("\n===== SALES REPORT =====")
-        print(f"Total Transactions : {total_transactions}")
-        print(f"Total Revenue      : ₹{total_revenue:.2f}")
-        print(f"Average Sale       : ₹{average_sale:.2f}")
+            cursor.execute(query)
+
+            record = cursor.fetchone()
+
+            total_transactions = record[0]
+            total_revenue = float(record[1])
+            average_sale = float(record[2])
+
+            if total_transactions == 0:
+                print("No sales data available.")
+                return
+
+            print("\n===== SALES REPORT =====")
+            print(f"Total Transactions : {total_transactions}")
+            print(f"Total Revenue      : ₹{total_revenue:.2f}")
+            print(f"Average Sale       : ₹{average_sale:.2f}")
+
+        except Error as e:
+
+            print("Database error:", e)
+
+        finally:
+
+            cursor.close()
+            connection.close()
 
     def low_stock_report(self):
-        products = read_records(self.PRODUCTS_FILE)
 
-        print("\n===== LOW STOCK PRODUCTS =====")
+        connection = create_connection()
 
-        found = False
+        if connection is None:
+            return
 
-        for record in products:
+        cursor = connection.cursor()
 
-            quantity = int(record["quantity"])
+        try:
 
-            if quantity <= 5:
+            query = """
+                SELECT
+                    product_id,
+                    name,
+                    category,
+                    price,
+                    quantity
+                FROM products
+                WHERE quantity <= 5
+                ORDER BY quantity
+            """
+
+            cursor.execute(query)
+
+            records = cursor.fetchall()
+
+            print("\n===== LOW STOCK PRODUCTS =====")
+
+            if not records:
+                print("No low-stock products.")
+                return
+
+            for record in records:
 
                 product = Product(
-                    record["product_id"],
-                    record["name"],
-                    record["category"],
-                    record["price"],
-                    record["quantity"]
+                    record[0],
+                    record[1],
+                    record[2],
+                    record[3],
+                    record[4]
                 )
 
                 product.display()
 
-                found = True
+        except Error as e:
 
-        if not found:
-            print("No low-stock products.")
+            print("Database error:", e)
+
+        finally:
+
+            cursor.close()
+            connection.close()

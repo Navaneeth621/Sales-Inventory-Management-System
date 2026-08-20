@@ -1,9 +1,7 @@
-from file_handler import (
-    initialize_file,
-    add_record,
-    read_records,
-    write_records
-)
+from multiprocessing import connection
+
+from database import create_connection
+from mysql.connector import Error
 
 
 class Product:
@@ -24,45 +22,79 @@ class Product:
             f"Stock: {self.quantity}"
         )
 
-    def to_list(self):
-        return [
-            self.product_id,
-            self.name,
-            self.category,
-            self.price,
-            self.quantity
-        ]
-
 
 class ProductManager:
 
-    FILE = "data/products.csv"
-
-    HEADERS = [
-        "product_id",
-        "name",
-        "category",
-        "price",
-        "quantity"
-    ]
-
-    def __init__(self):
-        initialize_file(self.FILE, self.HEADERS)
-
     def add_product(self, product):
-        records = read_records(self.FILE)
 
-        for record in records:
-            if record["product_id"] == product.product_id:
-                print("Product ID already exists.")
-                return
+        connection = create_connection()
 
-        add_record(self.FILE, product.to_list())
+        if connection is None:
+            return
+
+        cursor = connection.cursor()
+
+        # Check if product already exists
+        query = """
+            SELECT product_id
+            FROM products
+            WHERE product_id = %s
+        """
+
+        cursor.execute(query, (product.product_id,))
+
+        if cursor.fetchone():
+            print("Product ID already exists.")
+
+            cursor.close()
+            connection.close()
+            return
+
+        # Insert product
+        query = """
+            INSERT INTO products
+            (product_id, name, category, price, quantity)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+
+        values = (
+            product.product_id,
+            product.name,
+            product.category,
+            product.price,
+            product.quantity
+        )
+
+        cursor.execute(query, values)
+
+        connection.commit()
+
+        cursor.close()
+        connection.close()
 
         print("Product added successfully.")
 
     def view_products(self):
-        records = read_records(self.FILE)
+
+        connection = create_connection()
+
+        if connection is None:
+            return
+
+        cursor = connection.cursor()
+
+        query = """
+            SELECT product_id, name, category, price, quantity
+            FROM products
+            ORDER BY product_id
+        """
+
+        cursor.execute(query)
+
+        records = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
 
         if not records:
             print("No products found.")
@@ -71,17 +103,19 @@ class ProductManager:
         print("\n===== PRODUCT LIST =====")
 
         for record in records:
+
             product = Product(
-                record["product_id"],
-                record["name"],
-                record["category"],
-                record["price"],
-                record["quantity"]
+                record[0],
+                record[1],
+                record[2],
+                record[3],
+                record[4]
             )
 
             product.display()
 
     def search_product(self, product_id):
+
         product = self.get_product(product_id)
 
         if product:
@@ -90,45 +124,62 @@ class ProductManager:
             print("Product not found.")
 
     def update_product(self, product_id, new_price, new_quantity):
-        records = read_records(self.FILE)
 
-        for record in records:
-            if record["product_id"] == product_id:
+        connection = create_connection()
 
-                record["price"] = str(new_price)
-                record["quantity"] = str(new_quantity)
-
-                write_records(
-                    self.FILE,
-                    records,
-                    self.HEADERS
-                )
-
-                print("Product updated successfully.")
-                return
-
-        print("Product not found.")
-
-    def delete_product(self, product_id):
-        records = read_records(self.FILE)
-
-        new_records = [
-            record
-            for record in records
-            if record["product_id"] != product_id
-        ]
-
-        if len(new_records) == len(records):
-            print("Product not found.")
+        if connection is None:
             return
 
-        write_records(
-            self.FILE,
-            new_records,
-            self.HEADERS
+        cursor = connection.cursor()
+
+        query = """
+            UPDATE products
+            SET price = %s,
+                quantity = %s
+            WHERE product_id = %s
+        """
+
+        values = (
+            new_price,
+            new_quantity,
+            product_id
         )
 
-        print("Product deleted successfully.")
+        cursor.execute(query, values)
+
+        if cursor.rowcount == 0:
+            print("Product not found.")
+        else:
+            connection.commit()
+            print("Product updated successfully.")
+
+        cursor.close()
+        connection.close()
+
+    def delete_product(self, product_id):
+
+        connection = create_connection()
+
+        if connection is None:
+            return
+
+        cursor = connection.cursor()
+
+        query = """
+            DELETE FROM products
+            WHERE product_id = %s
+        """
+
+        cursor.execute(query, (product_id,))
+
+        if cursor.rowcount == 0:
+            print("Product not found.")
+        else:
+            connection.commit()
+            print("Product deleted successfully.")
+
+        cursor.close()
+        connection.close()
 
     def reduce_stock(self, product_id, quantity):
 
@@ -136,46 +187,91 @@ class ProductManager:
             print("Quantity must be greater than zero.")
             return False
 
-        records = read_records(self.FILE)
+        connection = create_connection()
 
-        for record in records:
+        if connection is None:
+            return False
 
-            if record["product_id"] == product_id:
+        cursor = connection.cursor()
 
-                current_stock = int(record["quantity"])
+        # Get current stock
+        query = """
+            SELECT quantity
+            FROM products
+            WHERE product_id = %s
+        """
 
-                if quantity > current_stock:
-                    print("Insufficient stock.")
-                    return False
+        cursor.execute(query, (product_id,))
 
-                record["quantity"] = str(
-                    current_stock - quantity
-                )
+        record = cursor.fetchone()
 
-                write_records(
-                    self.FILE,
-                    records,
-                    self.HEADERS
-                )
+        if record is None:
+            print("Product not found.")
 
-                return True
+            cursor.close()
+            connection.close()
+            return False
 
-        print("Product not found.")
-        return False
+        current_stock = int(record[0])
+
+        if quantity > current_stock:
+            print("Insufficient stock.")
+
+            cursor.close()
+            connection.close()
+            return False
+
+        # Update stock
+        new_stock = current_stock - quantity
+
+        query = """
+            UPDATE products
+            SET quantity = %s
+            WHERE product_id = %s
+        """
+
+        cursor.execute(
+            query,
+            (new_stock, product_id)
+        )
+
+        connection.commit()
+
+        cursor.close()
+        connection.close()
+
+        return True
 
     def get_product(self, product_id):
-        records = read_records(self.FILE)
 
-        for record in records:
+        connection = create_connection()
 
-            if record["product_id"] == product_id:
+        if connection is None:
+            return
 
-                return Product(
-                    record["product_id"],
-                    record["name"],
-                    record["category"],
-                    record["price"],
-                    record["quantity"]
-                )
+        cursor = connection.cursor()
+
+        query = """
+            SELECT product_id, name, category, price, quantity
+            FROM products
+            WHERE product_id = %s
+        """
+
+        cursor.execute(query, (product_id,))
+
+        record = cursor.fetchone()
+
+        cursor.close()
+        connection.close()
+
+        if record:
+
+            return Product(
+                record[0],
+                record[1],
+                record[2],
+                record[3],
+                record[4]
+            )
 
         return None
