@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from mysql.connector import Error
 
@@ -35,6 +36,22 @@ app = FastAPI(
     title="Smart Sales & Inventory Management API",
     description="Backend API for Sales and Inventory Management System",
     version="1.0.0"
+)
+
+
+# ============================================================
+# CORS
+# ============================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -118,7 +135,13 @@ def get_products():
             """
         )
 
-        return cursor.fetchall()
+        products = cursor.fetchall()
+
+        for product in products:
+            product["price"] = float(product["price"])
+            product["quantity"] = int(product["quantity"])
+
+        return products
 
     except Error as e:
 
@@ -170,6 +193,9 @@ def get_product(product_id: str):
                 status_code=404,
                 detail="Product not found"
             )
+
+        product["price"] = float(product["price"])
+        product["quantity"] = int(product["quantity"])
 
         return product
 
@@ -895,7 +921,13 @@ def get_sales():
             """
         )
 
-        return cursor.fetchall()
+        sales = cursor.fetchall()
+
+        for sale in sales:
+            sale["total"] = float(sale["total"])
+            sale["quantity"] = int(sale["quantity"])
+
+        return sales
 
     except Error as e:
 
@@ -950,6 +982,9 @@ def get_sale(sale_id: str):
                 detail="Sale not found"
             )
 
+        sale["total"] = float(sale["total"])
+        sale["quantity"] = int(sale["quantity"])
+
         return sale
 
     except HTTPException:
@@ -994,7 +1029,9 @@ def create_sale(sale: SaleCreate):
 
         connection.start_transaction()
 
+        # ----------------------------------------------------
         # Check customer
+        # ----------------------------------------------------
 
         cursor.execute(
             """
@@ -1017,7 +1054,9 @@ def create_sale(sale: SaleCreate):
                 detail="Customer not found"
             )
 
+        # ----------------------------------------------------
         # Check product
+        # ----------------------------------------------------
 
         cursor.execute(
             """
@@ -1043,7 +1082,9 @@ def create_sale(sale: SaleCreate):
                 detail="Product not found"
             )
 
+        # ----------------------------------------------------
         # Check stock
+        # ----------------------------------------------------
 
         if sale.quantity > product["quantity"]:
 
@@ -1052,11 +1093,15 @@ def create_sale(sale: SaleCreate):
                 detail="Insufficient stock"
             )
 
+        # ----------------------------------------------------
         # Calculate total
+        # ----------------------------------------------------
 
         total = float(product["price"]) * sale.quantity
 
+        # ----------------------------------------------------
         # Generate sale ID
+        # ----------------------------------------------------
 
         cursor.execute(
             """
@@ -1086,7 +1131,9 @@ def create_sale(sale: SaleCreate):
             "%Y-%m-%d %H:%M:%S"
         )
 
+        # ----------------------------------------------------
         # Reduce stock
+        # ----------------------------------------------------
 
         cursor.execute(
             """
@@ -1109,7 +1156,9 @@ def create_sale(sale: SaleCreate):
                 detail="Insufficient stock"
             )
 
+        # ----------------------------------------------------
         # Insert sale
+        # ----------------------------------------------------
 
         cursor.execute(
             """
@@ -1192,11 +1241,6 @@ def create_sale(sale: SaleCreate):
 # REPORT APIs
 # ============================================================
 
-
-# ------------------------------------------------------------
-# SALES SUMMARY REPORT
-# ------------------------------------------------------------
-
 @app.get("/reports/sales")
 def sales_report():
 
@@ -1226,9 +1270,15 @@ def sales_report():
         record = cursor.fetchone()
 
         return {
-            "total_transactions": record["total_transactions"],
-            "total_revenue": float(record["total_revenue"]),
-            "average_sale": float(record["average_sale"])
+            "total_transactions": int(
+                record["total_transactions"]
+            ),
+            "total_revenue": float(
+                record["total_revenue"]
+            ),
+            "average_sale": float(
+                record["average_sale"]
+            )
         }
 
     except Error as e:
@@ -1243,10 +1293,6 @@ def sales_report():
         cursor.close()
         connection.close()
 
-
-# ------------------------------------------------------------
-# LOW STOCK REPORT
-# ------------------------------------------------------------
 
 @app.get("/reports/low-stock")
 def low_stock_report():
@@ -1282,12 +1328,17 @@ def low_stock_report():
 
         for product in products:
 
-            product["price"] = float(product["price"])
+            product["price"] = float(
+                product["price"]
+            )
 
-        return {
-            "low_stock_count": len(products),
-            "products": products
-        }
+            product["quantity"] = int(
+                product["quantity"]
+            )
+
+        # Return the array directly because
+        # App.jsx expects lowStockProducts.map(...)
+        return products
 
     except Error as e:
 
